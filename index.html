@@ -94,6 +94,20 @@ main{padding:16px;max-width:640px;margin:0 auto}
 .numpad button:active{background:var(--line)}
 .big-n{font-size:52px;font-weight:750;text-align:center;letter-spacing:-.03em;line-height:1.1}
 
+/* ── calentamiento guiado, pantalla completa ── */
+.run{position:fixed;inset:0;z-index:250;background:var(--bg);overflow-y:auto;
+  padding:calc(20px + var(--safe-t)) 18px calc(24px + var(--safe-b));animation:fade .18s}
+.run-in{max-width:520px;margin:0 auto;min-height:100%;display:flex;
+  flex-direction:column;justify-content:center}
+.run-pill{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.07em;
+  padding:4px 10px;border-radius:20px;background:rgba(74,222,128,.15);
+  color:var(--ac);text-transform:uppercase}
+.run-q{font-size:82px;font-weight:750;letter-spacing:-.04em;text-align:center;
+  font-variant-numeric:tabular-nums;line-height:1.05;margin:22px 0 4px}
+.run-q.pau{color:var(--tx3)}
+.run-n{font-size:27px;font-weight:700;text-align:center;letter-spacing:-.02em;line-height:1.2}
+.run-d{font-size:15px;color:var(--ac);text-align:center;font-weight:650;margin-top:5px}
+
 /* ── timer ── */
 .timer{position:fixed;left:12px;right:12px;bottom:calc(84px + var(--safe-b));z-index:90;
   background:var(--ac);color:#07120b;border-radius:14px;padding:12px 16px;
@@ -226,43 +240,64 @@ const SESIONES = {
   A: {
     nombre:'Sesión A',
     bloques:[
-      {t:'Bloque A · superserie', d:'45 s entre ejercicios · 90 s por vuelta', s:3, ej:['flexion','dominada'], desc:[45,90]},
-      {t:'Bloque B · superserie', d:'45 s entre ejercicios · 75 s por vuelta', s:3, ej:['pierna','fondos'], desc:[45,75]},
-      {t:'Bloque C · superserie', d:'30 s entre ejercicios · 45 s por vuelta', s:2, ej:['curl','plancha'], desc:[30,45]},
-      {t:'Final', d:'Agarre', s:3, ej:['colgado'], desc:[45]}
+      {t:'Bloque A · superserie', d:'45 s entre ejercicios · 90 s por vuelta', s:3, ej:['flexion','dominada'], entre:45, vuelta:90},
+      {t:'Bloque B · superserie', d:'45 s entre ejercicios · 75 s por vuelta', s:3, ej:['pierna','fondos'], entre:45, vuelta:75},
+      {t:'Bloque C · superserie', d:'30 s entre ejercicios · 45 s por vuelta', s:2, ej:['curl','plancha'], entre:30, vuelta:45},
+      {t:'Final', d:'Agarre', s:3, ej:['colgado'], entre:45, vuelta:45}
     ]
   },
   B: {
     nombre:'Sesión B',
     bloques:[
-      {t:'Bloque A · superserie', d:'45 s entre ejercicios · 90 s por vuelta', s:3, ej:['vertical','remo'], desc:[45,90]},
-      {t:'Bloque B · superserie', d:'45 s entre ejercicios · 90 s por vuelta', s:3, ej:['pierna','dominada'], desc:[45,90]},
-      {t:'Bloque C · superserie', d:'30 s entre ejercicios · 45 s por vuelta', s:2, ej:['facepull','core'], desc:[30,45]},
-      {t:'Final', d:'Agarre', s:3, ej:['colgado'], desc:[45]}
+      {t:'Bloque A · superserie', d:'45 s entre ejercicios · 90 s por vuelta', s:3, ej:['vertical','remo'], entre:45, vuelta:90},
+      {t:'Bloque B · superserie', d:'45 s entre ejercicios · 90 s por vuelta', s:3, ej:['pierna','dominada'], entre:45, vuelta:90},
+      {t:'Bloque C · superserie', d:'30 s entre ejercicios · 45 s por vuelta', s:2, ej:['facepull','core'], entre:30, vuelta:45},
+      {t:'Final', d:'Agarre', s:3, ej:['colgado'], entre:45, vuelta:45}
     ]
   }
 };
 
+/* Descanso al cambiar de bloque. */
+const DESC_BLOQUE = 90;
+
+/* Calentamiento guiado. `seg` es la duración del temporizador; `dosis` es lo
+   que se muestra en pantalla (repeticiones o tiempo). Los pasos con
+   `manual:true` esperan a que pulses, en vez de avanzar solos. */
 const CALENTAMIENTO = [
-  ['Elevar pulso · 2 min', [
-    ['Marcha en el sitio, rodillas altas','60 s'],
-    ['Círculos de brazos adelante y atrás','30 s'],
-    ['Talones al glúteo','30 s']]],
-  ['Movilidad · 3 min', [
-    ['Rotaciones de muñeca y apoyo de palmas','30 s'],
-    ['Dislocaciones de hombro con goma o palo','10'],
-    ['Gato-camello','8'],
-    ['Rotación torácica tumbado de lado','5 / lado'],
-    ['Círculos de cadera','8 / lado'],
-    ['Sentadilla profunda sostenida','30 s']]],
-  ['Activación · 3 min', [
-    ['Band pull-apart','15'],
-    ['Puente de glúteo','12'],
-    ['Dominadas escapulares colgado','8'],
-    ['Flexión escapular en plancha','8'],
-    ['Plancha','20 s']]],
-  ['Aproximación', [
-    ['1 serie del primer ejercicio al 50 %','1']]]
+  {b:'Elevar pulso', ej:[
+    {n:'Marcha en el sitio, rodillas altas', dosis:'60 s', seg:60,
+     tec:'Sin impacto. Sube la rodilla a la altura de la cadera.'},
+    {n:'Círculos de brazos', dosis:'30 s', seg:30,
+     tec:'15 s hacia delante y 15 s hacia atrás, abriendo la amplitud.'},
+    {n:'Talones al glúteo', dosis:'30 s', seg:30,
+     tec:'En el sitio o caminando. Si la rodilla molesta, marcha suave.'}]},
+  {b:'Movilidad articular', ej:[
+    {n:'Rotaciones de muñeca y apoyo de palmas', dosis:'30 s', seg:30,
+     tec:'Imprescindible: las muñecas soportan todo el empuje.'},
+    {n:'Dislocaciones de hombro', dosis:'10 reps', seg:40,
+     tec:'Con goma o palo de escoba. Brazos estirados, de delante a detrás sin doblar el codo.'},
+    {n:'Gato-camello', dosis:'8 reps', seg:30,
+     tec:'A cuatro apoyos. Lento, vértebra a vértebra.'},
+    {n:'Rotación torácica tumbado', dosis:'5 por lado', seg:40,
+     tec:'De lado, abre el pecho siguiendo la mano con la mirada.'},
+    {n:'Círculos de cadera', dosis:'8 por lado', seg:30,
+     tec:'De pie, rodilla arriba y hacia fuera. Sin forzar.'},
+    {n:'Sentadilla profunda sostenida', dosis:'30 s', seg:30,
+     tec:'Agárrate a algo. Clave para la rodilla y el tobillo.'}]},
+  {b:'Activación', ej:[
+    {n:'Band pull-apart', dosis:'15 reps', seg:30,
+     tec:'Con la goma amarilla. Despierta la espalda alta.'},
+    {n:'Puente de glúteo', dosis:'12 reps', seg:30,
+     tec:'Aprieta el glúteo 1 s arriba. Protege rodilla y lumbar.'},
+    {n:'Dominadas escapulares', dosis:'8 reps', seg:30,
+     tec:'Colgado con los brazos rectos: solo bajas los hombros. Nunca falta antes de tirar.'},
+    {n:'Flexión escapular en plancha', dosis:'8 reps', seg:30,
+     tec:'En plancha alta, junta y separa las escápulas sin doblar el codo.'},
+    {n:'Plancha', dosis:'20 s', seg:20,
+     tec:'Glúteo y abdomen apretados. Cadera ni alta ni hundida.'}]},
+  {b:'Aproximación', ej:[
+    {n:'1 serie del primer ejercicio al 50 %', dosis:'1 serie', manual:true,
+     tec:'Mitad de repeticiones, sin esfuerzo. Ensaya el patrón, no lo fatigues.'}]}
 ];
 
 /* ══════════════════════════════════════════════════════════════════
@@ -443,6 +478,42 @@ function progresar(reg){
   return cambios;
 }
 
+/* ── Descansos ────────────────────────────────────────────────────
+   El descanso no depende de la serie que acabas de hacer, sino de la
+   que viene después. Se busca la siguiente serie sin registrar en orden
+   de superserie y se decide según dónde caiga:
+     · la pareja de la MISMA vuelta -> descanso corto  (entre)
+     · una vuelta distinta          -> descanso largo  (vuelta)
+     · un bloque distinto           -> DESC_BLOQUE
+     · no queda ninguna             -> sin temporizador
+   Lo que manda es la vuelta, no el ejercicio: al acabar el segundo de la
+   superserie toca volver al primero, y eso ya es vuelta nueva y descanso
+   largo aunque cambies de ejercicio. */
+function pasosDe(clave){
+  const pasos = [];
+  SESIONES[clave].bloques.forEach((b, bi)=>{
+    for(let s = 0; s < b.s; s++){
+      b.ej.forEach(e => pasos.push({bi, s, ej:e}));
+    }
+  });
+  return pasos;
+}
+
+function descansoTras(bi, ej, si){
+  if(!sesionActiva) return 0;
+  const pasos = pasosDe(sesionActiva.sesion);
+  const i = pasos.findIndex(p => p.bi===bi && p.ej===ej && p.s===si);
+  if(i < 0) return 0;
+  const libre = p => sesionActiva.reg[p.ej] && sesionActiva.reg[p.ej][p.s] === null;
+  let sig = null;
+  for(let j = i+1; j < pasos.length && !sig; j++) if(libre(pasos[j])) sig = pasos[j];
+  for(let j = 0; j < i && !sig; j++)              if(libre(pasos[j])) sig = pasos[j];
+  if(!sig) return 0;
+  const b = SESIONES[sesionActiva.sesion].bloques[bi];
+  if(sig.bi !== bi) return DESC_BLOQUE;
+  return sig.s === si ? b.entre : b.vuelta;
+}
+
 function sesionesCompletadas(){ return P().historial.length; }
 function ultimaSesionHecha(){ const h = P().historial; return h.length ? h[h.length-1] : null; }
 function sesionDeHoy(){
@@ -497,6 +568,132 @@ function sheet(html){
   document.body.appendChild(o);
 }
 function cerrar(){ const o = document.getElementById('ov'); if(o) o.remove(); }
+
+/* ══════════════════════════════════════════════════════════════════
+   CALENTAMIENTO GUIADO
+   Pantalla completa, avanza solo al acabar cada ejercicio.
+   ══════════════════════════════════════════════════════════════════ */
+let calen = null;   // {idx, q, pausa, prep, tmr}
+
+function calenLista(){
+  const l = [];
+  CALENTAMIENTO.forEach(b => b.ej.forEach(e => l.push(Object.assign({bloque:b.b}, e))));
+  return l;
+}
+
+function pitido(hz, dur){
+  try{
+    const C = window.AudioContext || window.webkitAudioContext; if(!C) return;
+    calen && calen.ac || 0;
+    const ac = (calen && calen.ac) || new C();
+    if(calen) calen.ac = ac;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.frequency.value = hz; o.type = 'sine';
+    g.gain.setValueAtTime(0.001, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.25, ac.currentTime + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + dur);
+    o.connect(g); g.connect(ac.destination);
+    o.start(); o.stop(ac.currentTime + dur + 0.02);
+  }catch(e){}
+}
+
+function calenEmpezar(){
+  pararTimer();
+  calen = {idx:-1, q:5, pausa:false, prep:true, ac:null};
+  pitido(660, .12);
+  pintarCalen();
+  calen.tmr = setInterval(calenTick, 1000);
+}
+
+function calenTick(){
+  if(!calen || calen.pausa) return;
+  calen.q--;
+  if(calen.q <= 0){ calenAvanzar(1); return; }
+  if(calen.q <= 3) pitido(660, .07);
+  pintarCalen();
+}
+
+function calenAvanzar(d){
+  if(!calen) return;
+  const l = calenLista();
+  calen.prep = false;
+  calen.idx += d;
+  if(calen.idx >= l.length){ calenFin(); return; }
+  if(calen.idx < 0) calen.idx = 0;
+  const e = l[calen.idx];
+  calen.q = e.manual ? 0 : e.seg;
+  calen.pausa = false;
+  pitido(920, .16); vibrar();
+  pintarCalen();
+}
+
+function calenPausa(){ if(calen){ calen.pausa = !calen.pausa; pintarCalen(); } }
+
+function calenSalir(){
+  if(calen && calen.tmr) clearInterval(calen.tmr);
+  calen = null;
+  const e = document.getElementById('calrun'); if(e) e.remove();
+  render();
+}
+
+function calenFin(){
+  if(calen && calen.tmr) clearInterval(calen.tmr);
+  if(calen) calen.tmr = null;
+  pitido(1180, .35); vibrar();
+  const sig = sesionDeHoy();
+  const el = document.getElementById('calrun');
+  if(!el) return;
+  el.innerHTML =
+    '<div class="run-in" style="text-align:center">'+
+    '<div style="font-size:56px">✓</div>'+
+    '<h2 style="margin-top:10px;font-size:26px">Calentamiento completado</h2>'+
+    '<p class="muted" style="margin:8px 0 26px">Estás listo. Sin pausas largas ahora: '+
+    'el efecto del calentamiento dura unos minutos.</p>'+
+    (sig ? '<button class="btn" onclick="calenSalir();empezar(\''+sig+'\')">Empezar '+
+           esc(SESIONES[sig].nombre)+'</button>' : '')+
+    '<button class="btn sec" style="margin-top:10px" onclick="calenSalir()">Cerrar</button></div>';
+}
+
+function pintarCalen(){
+  let el = document.getElementById('calrun');
+  if(!el){ el = document.createElement('div'); el.id = 'calrun'; el.className = 'run';
+           document.body.appendChild(el); }
+  const l = calenLista();
+
+  if(calen.prep){
+    el.innerHTML = '<div class="run-in" style="text-align:center">'+
+      '<div class="run-pill">Prepárate</div>'+
+      '<div class="run-q" style="color:var(--warn)">'+calen.q+'</div>'+
+      '<div class="run-n">'+esc(l[0].n)+'</div>'+
+      '<div class="muted" style="margin-top:6px">'+esc(l[0].dosis)+'</div>'+
+      '<button class="btn sec" style="margin-top:30px" onclick="calenSalir()">Salir</button></div>';
+    return;
+  }
+
+  const e = l[calen.idx], sig = l[calen.idx+1];
+  const pct = Math.round((calen.idx)/l.length*100);
+  el.innerHTML = '<div class="run-in">'+
+    '<div class="between"><span class="run-pill">'+esc(e.bloque)+'</span>'+
+    '<span class="tiny">'+(calen.idx+1)+' de '+l.length+'</span></div>'+
+    '<div class="bar" style="margin-top:10px"><i style="width:'+pct+'%"></i></div>'+
+    '<div class="run-q'+(calen.pausa?' pau':'')+'">'+
+      (e.manual ? '—' : Math.floor(calen.q/60)+':'+String(calen.q%60).padStart(2,'0'))+'</div>'+
+    '<div class="run-n">'+esc(e.n)+'</div>'+
+    '<div class="run-d">'+esc(e.dosis)+'</div>'+
+    '<p class="muted" style="margin:16px 0 0;font-size:14.5px">'+esc(e.tec)+'</p>'+
+    (sig ? '<p class="tiny" style="margin:20px 0 0">Después: '+esc(sig.n)+'</p>'
+         : '<p class="tiny" style="margin:20px 0 0">Último ejercicio</p>')+
+    '<div class="row" style="margin-top:20px;gap:8px">'+
+      '<button class="btn sec" onclick="calenAvanzar(-1)" style="flex:1">‹</button>'+
+      (e.manual
+        ? '<button class="btn" onclick="calenAvanzar(1)" style="flex:3">Hecho</button>'
+        : '<button class="btn'+(calen.pausa?'':' sec')+'" onclick="calenPausa()" style="flex:3">'+
+          (calen.pausa?'Reanudar':'Pausa')+'</button>')+
+      '<button class="btn sec" onclick="calenAvanzar(1)" style="flex:1">›</button>'+
+    '</div>'+
+    '<button class="btn sec" style="margin-top:9px" onclick="calenSalir()">Salir del calentamiento</button>'+
+    '</div>';
+}
 
 /* ── cronómetro de descanso ── */
 let tmr = null;
@@ -563,13 +760,19 @@ function vHoy(){
   return h;
 }
 
-/* Bloques del calentamiento. El primero abierto: es por donde se empieza. */
+/* Bloques del calentamiento, con el botón para lanzarlo guiado. */
 function htmlCalentamiento(){
-  let h = '<div class="card tight">';
-  CALENTAMIENTO.forEach(([t, items], i)=>{
-    h += '<details'+(i===0?' open':'')+'><summary>'+esc(t)+
-         '<span class="tiny">'+items.length+' ej.</span></summary><table style="margin-top:8px">';
-    items.forEach(([n,d])=>{ h += '<tr><td>'+esc(n)+'</td><td class="num muted">'+esc(d)+'</td></tr>'; });
+  const total = CALENTAMIENTO.reduce((s,b)=>s + b.ej.reduce((x,e)=>x + (e.seg||0), 0), 0);
+  let h = '<div class="card"><button class="btn" onclick="calenEmpezar()">'+
+          'Empezar calentamiento guiado</button>'+
+          '<p class="tiny" style="margin:10px 0 0;text-align:center">'+
+          CALENTAMIENTO.reduce((s,b)=>s+b.ej.length,0)+' ejercicios · '+
+          Math.round(total/60)+' min · avanza solo</p></div>';
+  h += '<div class="card tight">';
+  CALENTAMIENTO.forEach((b, i)=>{
+    h += '<details'+(i===0?' open':'')+'><summary>'+esc(b.b)+
+         '<span class="tiny">'+b.ej.length+' ej.</span></summary><table style="margin-top:8px">';
+    b.ej.forEach(e=>{ h += '<tr><td>'+esc(e.n)+'</td><td class="num muted">'+esc(e.dosis)+'</td></tr>'; });
     h += '</table></details>';
   });
   h += '<p class="tiny" style="margin:12px 0 0">Nada de estiramientos estáticos largos antes de entrenar: '+
@@ -630,10 +833,11 @@ function vSesion(){
   h += '<details class="card tight" style="margin-bottom:12px">'+
        '<summary style="font-weight:650;font-size:14.5px">Calentamiento · 8 min'+
        '<span class="tiny">tocar para ver</span></summary>'+
-       '<div style="margin-top:4px">';
-  CALENTAMIENTO.forEach(([t, items])=>{
-    h += '<div class="sec-title" style="margin:14px 0 6px">'+esc(t)+'</div><table>';
-    items.forEach(([n,d])=>{ h += '<tr><td>'+esc(n)+'</td><td class="num muted">'+esc(d)+'</td></tr>'; });
+       '<div style="margin-top:4px">'+
+       '<button class="btn sec" style="margin:10px 0" onclick="calenEmpezar()">Lanzarlo guiado</button>';
+  CALENTAMIENTO.forEach(b=>{
+    h += '<div class="sec-title" style="margin:14px 0 6px">'+esc(b.b)+'</div><table>';
+    b.ej.forEach(e=>{ h += '<tr><td>'+esc(e.n)+'</td><td class="num muted">'+esc(e.dosis)+'</td></tr>'; });
     h += '</table>';
   });
   h += '</div></details>';
@@ -653,8 +857,8 @@ function vSesion(){
            '<button class="btn sec sm" onclick="tec(\''+k2+'\')">Técnica</button></div><div class="sets">';
       sesionActiva.reg[k2].forEach((v, si)=>{
         const cls = v===null ? '' : (v >= meta ? 'done' : 'low');
-        h += '<button class="set '+cls+'" onclick="anotar(\''+k2+'\','+si+','+meta+','+
-             (b.desc[ei]||60)+')"><div class="n">S'+(si+1)+'</div>'+
+        h += '<button class="set '+cls+'" onclick="anotar(\''+k2+'\','+si+','+meta+','+bi+')">'+
+             '<div class="n">S'+(si+1)+'</div>'+
              '<div class="v">'+(v===null ? '—' : v) + '</div></button>';
       });
       h += '</div><div class="obj">Objetivo '+meta+uni+' por serie · deja 1-2 en la recámara</div></div>';
@@ -681,8 +885,8 @@ function tec(k){
 }
 
 let pend = null;
-function anotar(k, si, meta, desc){
-  pend = {k, si, meta, desc, val: String(sesionActiva.reg[k][si] ?? meta)};
+function anotar(k, si, meta, bi){
+  pend = {k, si, meta, bi, val: String(sesionActiva.reg[k][si] ?? meta)};
   const f = FIJOS[k], uni = (f && f.tipo==='seg') ? 'segundos' : 'repeticiones';
   const nom = LADDERS[k] ? LADDERS[k].nombre : f.nombre;
   let g = '';
@@ -700,9 +904,12 @@ function np(t){
   else if(t==='ok'){
     const v = parseInt(pend.val||'0', 10);
     sesionActiva.reg[pend.k][pend.si] = isNaN(v) ? 0 : v;
-    const ultimaDelEj = pend.si === sesionActiva.reg[pend.k].length - 1;
+    /* El descanso se calcula DESPUÉS de anotar: así se sabe cuál es la
+       siguiente serie pendiente de verdad. Si no queda ninguna, no hay
+       temporizador, porque la sesión ha terminado. */
+    const seg = descansoTras(pend.bi, pend.k, pend.si);
     cerrar(); render();
-    if(!ultimaDelEj || true) descanso(pend.desc);
+    if(seg > 0) descanso(seg);
     pend = null; return;
   }
   else pend.val = (pend.val==='0' ? '' : pend.val) + t;
