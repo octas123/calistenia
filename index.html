@@ -260,9 +260,12 @@ const SESIONES = {
 /* Descanso al cambiar de bloque. */
 const DESC_BLOQUE = 90;
 
-/* Calentamiento guiado. `seg` es la duración del temporizador; `dosis` es lo
-   que se muestra en pantalla (repeticiones o tiempo). Los pasos con
-   `manual:true` esperan a que pulses, en vez de avanzar solos. */
+/* Calentamiento guiado.
+   `seg`  -> ejercicio por tiempo: cuenta atrás y avanza solo.
+   `reps` -> ejercicio por repeticiones: sin cuenta atrás, avanza al pulsar.
+             `est` es solo una estimación para calcular la duración total.
+   Un ejercicio de repeticiones nunca lleva temporizador: cada persona las
+   hace a su ritmo y un cronómetro solo mete prisa donde no debe. */
 const CALENTAMIENTO = [
   {b:'Elevar pulso', ej:[
     {n:'Marcha en el sitio, rodillas altas', dosis:'60 s', seg:60,
@@ -274,29 +277,29 @@ const CALENTAMIENTO = [
   {b:'Movilidad articular', ej:[
     {n:'Rotaciones de muñeca y apoyo de palmas', dosis:'30 s', seg:30,
      tec:'Imprescindible: las muñecas soportan todo el empuje.'},
-    {n:'Dislocaciones de hombro', dosis:'10 reps', seg:40,
+    {n:'Dislocaciones de hombro', dosis:'10', unidad:'repeticiones', reps:true, est:40,
      tec:'Con goma o palo de escoba. Brazos estirados, de delante a detrás sin doblar el codo.'},
-    {n:'Gato-camello', dosis:'8 reps', seg:30,
+    {n:'Gato-camello', dosis:'8', unidad:'repeticiones', reps:true, est:30,
      tec:'A cuatro apoyos. Lento, vértebra a vértebra.'},
-    {n:'Rotación torácica tumbado', dosis:'5 por lado', seg:40,
+    {n:'Rotación torácica tumbado', dosis:'5', unidad:'por lado', reps:true, est:40,
      tec:'De lado, abre el pecho siguiendo la mano con la mirada.'},
-    {n:'Círculos de cadera', dosis:'8 por lado', seg:30,
+    {n:'Círculos de cadera', dosis:'8', unidad:'por lado', reps:true, est:30,
      tec:'De pie, rodilla arriba y hacia fuera. Sin forzar.'},
     {n:'Sentadilla profunda sostenida', dosis:'30 s', seg:30,
      tec:'Agárrate a algo. Clave para la rodilla y el tobillo.'}]},
   {b:'Activación', ej:[
-    {n:'Band pull-apart', dosis:'15 reps', seg:30,
+    {n:'Band pull-apart', dosis:'15', unidad:'repeticiones', reps:true, est:30,
      tec:'Con la goma amarilla. Despierta la espalda alta.'},
-    {n:'Puente de glúteo', dosis:'12 reps', seg:30,
+    {n:'Puente de glúteo', dosis:'12', unidad:'repeticiones', reps:true, est:30,
      tec:'Aprieta el glúteo 1 s arriba. Protege rodilla y lumbar.'},
-    {n:'Dominadas escapulares', dosis:'8 reps', seg:30,
+    {n:'Dominadas escapulares', dosis:'8', unidad:'repeticiones', reps:true, est:30,
      tec:'Colgado con los brazos rectos: solo bajas los hombros. Nunca falta antes de tirar.'},
-    {n:'Flexión escapular en plancha', dosis:'8 reps', seg:30,
+    {n:'Flexión escapular en plancha', dosis:'8', unidad:'repeticiones', reps:true, est:30,
      tec:'En plancha alta, junta y separa las escápulas sin doblar el codo.'},
     {n:'Plancha', dosis:'20 s', seg:20,
      tec:'Glúteo y abdomen apretados. Cadera ni alta ni hundida.'}]},
   {b:'Aproximación', ej:[
-    {n:'1 serie del primer ejercicio al 50 %', dosis:'1 serie', manual:true,
+    {n:'1 serie del primer ejercicio al 50 %', dosis:'1', unidad:'serie', reps:true, est:60,
      tec:'Mitad de repeticiones, sin esfuerzo. Ensaya el patrón, no lo fatigues.'}]}
 ];
 
@@ -625,6 +628,10 @@ function calenEmpezar(){
 
 function calenTick(){
   if(!calen || calen.pausa) return;
+  if(!calen.prep){
+    const e = calenLista()[calen.idx];
+    if(e && e.reps) return;      // por repeticiones: espera a que pulses
+  }
   calen.q--;
   if(calen.q <= 0){ calenAvanzar(1); return; }
   if(calen.q <= 3) pitido(660, .07);
@@ -639,7 +646,7 @@ function calenAvanzar(d){
   if(calen.idx >= l.length){ calenFin(); return; }
   if(calen.idx < 0) calen.idx = 0;
   const e = l[calen.idx];
-  calen.q = e.manual ? 0 : e.seg;
+  calen.q = e.reps ? 0 : e.seg;   // los de repeticiones no arrancan cuenta atrás
   calen.pausa = false;
   pitido(920, .16); vibrar();
   pintarCalen();
@@ -683,30 +690,41 @@ function pintarCalen(){
       '<div class="run-pill">Prepárate</div>'+
       '<div class="run-q" style="color:var(--warn)">'+calen.q+'</div>'+
       '<div class="run-n">'+esc(l[0].n)+'</div>'+
-      '<div class="muted" style="margin-top:6px">'+esc(l[0].dosis)+'</div>'+
+      '<div class="muted" style="margin-top:6px">'+esc(l[0].dosis)+
+      (l[0].unidad ? ' '+esc(l[0].unidad) : '')+'</div>'+
       '<button class="btn sec" style="margin-top:30px" onclick="calenSalir()">Salir</button></div>';
     return;
   }
 
   const e = l[calen.idx], sig = l[calen.idx+1];
   const pct = Math.round((calen.idx)/l.length*100);
+
+  /* Por tiempo: cuenta atrás grande y botón de pausa.
+     Por repeticiones: el número de reps grande y un botón para confirmar. */
+  const centro = e.reps
+    ? '<div class="run-q">'+esc(e.dosis)+'</div>'+
+      '<div class="run-d" style="margin-top:-2px">'+esc(e.unidad)+'</div>'
+    : '<div class="run-q'+(calen.pausa?' pau':'')+'">'+
+      Math.floor(calen.q/60)+':'+String(calen.q%60).padStart(2,'0')+'</div>'+
+      '<div class="run-d">'+esc(e.dosis)+'</div>';
+
+  const accion = e.reps
+    ? '<button class="btn" onclick="calenAvanzar(1)" style="flex:3">Hecho</button>'
+    : '<button class="btn'+(calen.pausa?'':' sec')+'" onclick="calenPausa()" style="flex:3">'+
+      (calen.pausa?'Reanudar':'Pausa')+'</button>';
+
   el.innerHTML = '<div class="run-in">'+
     '<div class="between"><span class="run-pill">'+esc(e.bloque)+'</span>'+
     '<span class="tiny">'+(calen.idx+1)+' de '+l.length+'</span></div>'+
     '<div class="bar" style="margin-top:10px"><i style="width:'+pct+'%"></i></div>'+
-    '<div class="run-q'+(calen.pausa?' pau':'')+'">'+
-      (e.manual ? '—' : Math.floor(calen.q/60)+':'+String(calen.q%60).padStart(2,'0'))+'</div>'+
-    '<div class="run-n">'+esc(e.n)+'</div>'+
-    '<div class="run-d">'+esc(e.dosis)+'</div>'+
-    '<p class="muted" style="margin:16px 0 0;font-size:14.5px">'+esc(e.tec)+'</p>'+
-    (sig ? '<p class="tiny" style="margin:20px 0 0">Después: '+esc(sig.n)+'</p>'
-         : '<p class="tiny" style="margin:20px 0 0">Último ejercicio</p>')+
+    centro+
+    '<div class="run-n" style="margin-top:14px">'+esc(e.n)+'</div>'+
+    '<p class="muted" style="margin:14px 0 0;font-size:14.5px;text-align:center">'+esc(e.tec)+'</p>'+
+    (sig ? '<p class="tiny" style="margin:20px 0 0;text-align:center">Después: '+esc(sig.n)+'</p>'
+         : '<p class="tiny" style="margin:20px 0 0;text-align:center">Último ejercicio</p>')+
     '<div class="row" style="margin-top:20px;gap:8px">'+
       '<button class="btn sec" onclick="calenAvanzar(-1)" style="flex:1">‹</button>'+
-      (e.manual
-        ? '<button class="btn" onclick="calenAvanzar(1)" style="flex:3">Hecho</button>'
-        : '<button class="btn'+(calen.pausa?'':' sec')+'" onclick="calenPausa()" style="flex:3">'+
-          (calen.pausa?'Reanudar':'Pausa')+'</button>')+
+      accion+
       '<button class="btn sec" onclick="calenAvanzar(1)" style="flex:1">›</button>'+
     '</div>'+
     '<button class="btn sec" style="margin-top:9px" onclick="calenSalir()">Salir del calentamiento</button>'+
@@ -780,17 +798,19 @@ function vHoy(){
 
 /* Bloques del calentamiento, con el botón para lanzarlo guiado. */
 function htmlCalentamiento(){
-  const total = CALENTAMIENTO.reduce((s,b)=>s + b.ej.reduce((x,e)=>x + (e.seg||0), 0), 0);
+  const total = CALENTAMIENTO.reduce((s,b)=>s + b.ej.reduce((x,e)=>x + (e.seg||e.est||0), 0), 0);
   let h = '<div class="card"><button class="btn" onclick="calenEmpezar()">'+
           'Empezar calentamiento guiado</button>'+
           '<p class="tiny" style="margin:10px 0 0;text-align:center">'+
-          CALENTAMIENTO.reduce((s,b)=>s+b.ej.length,0)+' ejercicios · '+
-          Math.round(total/60)+' min · avanza solo</p></div>';
+          CALENTAMIENTO.reduce((s,b)=>s+b.ej.length,0)+' ejercicios · unos '+
+          Math.round(total/60)+' min</p></div>';
   h += '<div class="card tight">';
   CALENTAMIENTO.forEach((b, i)=>{
     h += '<details'+(i===0?' open':'')+'><summary>'+esc(b.b)+
          '<span class="tiny">'+b.ej.length+' ej.</span></summary><table style="margin-top:8px">';
-    b.ej.forEach(e=>{ h += '<tr><td>'+esc(e.n)+'</td><td class="num muted">'+esc(e.dosis)+'</td></tr>'; });
+    b.ej.forEach(e=>{ h += '<tr><td>'+esc(e.n)+'</td><td class="num muted">'+esc(e.dosis)+
+                           (e.unidad ? ' '+esc(e.unidad === 'repeticiones' ? 'reps' : e.unidad) : '')+
+                           '</td></tr>'; });
     h += '</table></details>';
   });
   h += '<p class="tiny" style="margin:12px 0 0">Nada de estiramientos estáticos largos antes de entrenar: '+
@@ -855,7 +875,9 @@ function vSesion(){
        '<button class="btn sec" style="margin:10px 0" onclick="calenEmpezar()">Lanzarlo guiado</button>';
   CALENTAMIENTO.forEach(b=>{
     h += '<div class="sec-title" style="margin:14px 0 6px">'+esc(b.b)+'</div><table>';
-    b.ej.forEach(e=>{ h += '<tr><td>'+esc(e.n)+'</td><td class="num muted">'+esc(e.dosis)+'</td></tr>'; });
+    b.ej.forEach(e=>{ h += '<tr><td>'+esc(e.n)+'</td><td class="num muted">'+esc(e.dosis)+
+                           (e.unidad ? ' '+esc(e.unidad === 'repeticiones' ? 'reps' : e.unidad) : '')+
+                           '</td></tr>'; });
     h += '</table>';
   });
   h += '</div></details>';
