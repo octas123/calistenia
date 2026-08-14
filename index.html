@@ -102,9 +102,11 @@ main{padding:16px;max-width:640px;margin:0 auto}
   padding:calc(20px + var(--safe-t)) 18px calc(24px + var(--safe-b));animation:fade .18s}
 .run-in{max-width:520px;margin:0 auto;min-height:100%;display:flex;
   flex-direction:column;justify-content:center}
-.run-pill{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.07em;
-  padding:4px 10px;border-radius:20px;background:rgba(74,222,128,.15);
-  color:var(--ac);text-transform:uppercase}
+/* align-self evita que la etiqueta se estire a todo el ancho: .run-in es
+   un contenedor flex en columna y por defecto estira a sus hijos. */
+.run-pill{display:inline-block;align-self:center;font-size:11px;font-weight:800;
+  letter-spacing:.07em;padding:4px 10px;border-radius:20px;
+  background:rgba(74,222,128,.15);color:var(--ac);text-transform:uppercase}
 .run-q{font-size:82px;font-weight:750;letter-spacing:-.04em;text-align:center;
   font-variant-numeric:tabular-nums;line-height:1.05;margin:22px 0 4px}
 .run-q.pau{color:var(--tx3)}
@@ -714,9 +716,9 @@ function pintarCalen(){
   const centro = e.reps
     ? '<div class="run-q">'+esc(e.dosis)+'</div>'+
       '<div class="run-d" style="margin-top:-2px">'+esc(e.unidad)+'</div>'
+    /* En los de tiempo no se repite la dosis: la cuenta atrás ya la dice. */
     : '<div class="run-q'+(calen.pausa?' pau':'')+'">'+
-      Math.floor(calen.q/60)+':'+String(calen.q%60).padStart(2,'0')+'</div>'+
-      '<div class="run-d">'+esc(e.dosis)+'</div>';
+      Math.floor(calen.q/60)+':'+String(calen.q%60).padStart(2,'0')+'</div>';
 
   const accion = e.reps
     ? '<button class="btn" onclick="calenAvanzar(1)" style="flex:3">Hecho</button>'
@@ -791,7 +793,7 @@ function vHoy(){
          '<button class="btn" onclick="empezar(\''+sig+'\')">Empezar sesión</button>'+
          '</div>';
 
-    h += '<div class="sec-title">1 · Calentamiento · 8 min</div>' + htmlCalentamiento();
+    h += '<div class="sec-title">1 · Calentamiento</div>' + htmlCalentamiento();
 
     h += '<div class="sec-title">2 · La sesión</div>';
     ses.bloques.forEach(b=>{
@@ -879,7 +881,7 @@ function vSesion(){
 
   /* El calentamiento sigue a mano durante la sesión, plegado para no estorbar. */
   h += '<details class="card tight" style="margin-bottom:12px">'+
-       '<summary style="font-weight:650;font-size:14.5px">Calentamiento · 8 min'+
+       '<summary style="font-weight:650;font-size:14.5px">Calentamiento'+
        '<span class="tiny">tocar para ver</span></summary>'+
        '<div style="margin-top:4px">'+
        '<button class="btn sec" style="margin:10px 0" onclick="calenEmpezar()">Lanzarlo guiado</button>';
