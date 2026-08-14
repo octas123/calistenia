@@ -404,19 +404,36 @@ function sbHeaders(c, extra){
   return Object.assign(h, extra || {});
 }
 
+/* Sube TODOS los perfiles con datos, no solo el activo. Si solo se subiera
+   el activo, un perfil que nunca se ha abierto en este móvil no llegaría
+   jamás al otro, y allí aparecería vacío. */
 async function empujar(){
   const c = sbCfg(); if(!c) return;
+  const filas = Object.keys(S.perfiles)
+    .filter(k => (S.perfiles[k].actualizado || 0) > 0)
+    .map(k => ({perfil:k, data:S.perfiles[k],
+                updated_at:new Date(S.perfiles[k].actualizado).toISOString()}));
+  if(!filas.length){ setDot('ok'); return; }
   setDot('busy');
   try{
-    const cuerpo = [{perfil:S.perfilActivo, data:P(), updated_at:new Date().toISOString()}];
     const r = await fetch(c.url.replace(/\/$/,'') + '/rest/v1/calistenia?on_conflict=perfil', {
       method:'POST',
       headers: sbHeaders(c, {'Content-Type':'application/json',
                              'Prefer':'resolution=merge-duplicates'}),
-      body: JSON.stringify(cuerpo)
+      body: JSON.stringify(filas)
     });
     setDot(r.ok ? 'ok' : 'err');
-  }catch(e){ setDot('err'); }
+    return r.ok;
+  }catch(e){ setDot('err'); return false; }
+}
+
+/* Sincronización completa en dos direcciones: primero baja lo que haya más
+   reciente en la nube, luego sube lo que aquí sea más nuevo. En ese orden,
+   porque así lo local recién bajado no se vuelve a subir. */
+async function sincronizar(silencioso){
+  if(!sbCfg()){ if(!silencioso) toast('Configura la sincronización en Ajustes'); return; }
+  await tirar(silencioso);
+  await empujar();
 }
 
 async function tirar(silencioso){
@@ -439,7 +456,8 @@ async function tirar(silencioso){
     setDot('ok');
     if(!silencioso) toast(n ? 'Actualizados '+n+' perfiles' : 'Ya estaba todo al día');
     render();
-  }catch(e){ setDot('err'); if(!silencioso) toast('No se pudo conectar'); }
+    return true;
+  }catch(e){ setDot('err'); if(!silencioso) toast('No se pudo conectar'); return false; }
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -1204,7 +1222,7 @@ function vAjustes(){
     '<div class="tiny">URL del proyecto</div><input id="sbUrl" placeholder="https://xxxx.supabase.co" value="'+esc(c.url||'')+'">'+
     '<div class="tiny" style="margin-top:9px">Clave publishable</div><input id="sbKey" placeholder="sb_publishable_..." value="'+esc(c.key||'')+'">'+
     '<button class="btn" style="margin-top:12px" onclick="guardarSb()">Guardar y probar</button>'+
-    '<button class="btn sec" style="margin-top:9px" onclick="tirar()">Traer datos del otro móvil</button>'+
+    '<button class="btn sec" style="margin-top:9px" onclick="sincronizar()">Sincronizar ahora</button>'+
     '<p class="tiny" style="margin:12px 0 0">Estado: '+
     (syncEstado==='ok'?'<span style="color:var(--ac)">conectado</span>':
      syncEstado==='err'?'<span style="color:var(--bad)">error de conexión</span>':'sin configurar')+
@@ -1213,8 +1231,13 @@ function vAjustes(){
   h += '<div class="sec-title">Perfiles</div><div class="card tight"><table>';
   Object.keys(S.perfiles).forEach(k=>{
     const p = S.perfiles[k];
+    const a = p.actualizado ? new Date(p.actualizado) : null;
     h += '<tr><td><b>'+esc(p.nombre)+'</b><div class="tiny">'+p.historial.length+' sesiones · '+
-         (p.peso?p.peso+' kg':'sin peso')+'</div></td>'+
+         (p.peso?p.peso+' kg':'sin peso')+'<br>'+
+         (a ? 'Último cambio: '+a.toLocaleDateString('es-ES')+' '+
+              a.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})
+            : '<span style="color:var(--warn)">Sin datos todavía: no se sube a la nube</span>')+
+         '</div></td>'+
          '<td class="num"><button class="btn sec sm" onclick="renombrar(\''+k+'\')">Renombrar</button></td></tr>';
   });
   h += '</table></div>';
@@ -1247,7 +1270,7 @@ function guardarSb(){
   S.supabase = {url: document.getElementById('sbUrl').value.trim(),
                 key: document.getElementById('sbKey').value.trim()};
   localStorage.setItem(LS, JSON.stringify(S));
-  tirar();
+  sincronizar();
 }
 function renombrar(k){
   sheet('<h3>Renombrar perfil</h3><input id="rnN" value="'+esc(S.perfiles[k].nombre)+'" style="margin-top:12px">'+
@@ -1316,7 +1339,7 @@ function cambiarPerfil(k){
 
 /* arranque */
 render();
-if(sbCfg()) tirar(true);
+if(sbCfg()) sincronizar(true);
 
 /* Al volver a la app desde el multitarea, baja lo que haya subido el otro
    móvil. Con margen de 30 s para no repetir la petición al cambiar de app
@@ -1326,7 +1349,7 @@ document.addEventListener('visibilitychange', ()=>{
   if(document.visibilityState !== 'visible') return;
   if(sesionActiva || !sbCfg()) return;
   if(Date.now() - ultimoTirar < 30000) return;
-  tirar(true);
+  sincronizar(true);
 });
 
 window.addEventListener('beforeunload', e => {
